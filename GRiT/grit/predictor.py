@@ -48,7 +48,7 @@ class Visualizer_GRiT(Visualizer):
         return self.output
 
 
-class VisualizationDemo(object):
+class Predictor(object):
     def __init__(self, cfg, instance_mode=ColorMode.IMAGE):
         self.cpu_device = torch.device("cpu")
         self.instance_mode = instance_mode

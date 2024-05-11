@@ -6,6 +6,13 @@ import cv2
 import tqdm
 import sys
 
+import numpy as np
+
+
+from flask import Flask, request, jsonify
+
+from PIL import Image
+
 from detectron2.config import get_cfg
 from detectron2.data.detection_utils import read_image
 from detectron2.utils.logger import setup_logger
@@ -14,12 +21,12 @@ sys.path.insert(0, 'third_party/CenterNet2/projects/CenterNet2/')
 from centernet.config import add_centernet_config
 from grit.config import add_grit_config
 
-from grit.predictor import VisualizationDemo
+from grit.predictor import Predictor
 
 
 # constants
 WINDOW_NAME = "GRiT"
-
+app = Flask(__name__)
 
 def setup_cfg(args):
     cfg = get_cfg()
@@ -81,6 +88,45 @@ def get_parser():
     )
     return parser
 
+@app.route('/predict', methods=['POST'])
+def predict():
+    filename = request.files['image'].filename
+    image = Image.open(request.files['image'].stream)
+    if (image != None):
+        print('hey')
+        print(filename)
+
+    image = image.convert('RGB')
+    img = np.asarray(image)
+
+    # если будет баг с ориентацией изображения решение здесь detectron2>data>detection_utils строка 119
+
+    # RGB > BGR
+    # Можно не париться и задать input_format RGB, оно сделает это в модели
+    img = img[:, :, ::-1]
+
+    start_time = time.time()
+    predictions, visualized_output = pred.run_on_image(img)
+    logger.info(
+        "{}: {} in {:.2f}s".format(
+            filename,
+            "detected {} instances".format(len(predictions["instances"]))
+            if "instances" in predictions
+            else "finished",
+            time.time() - start_time,
+        )
+    )
+
+    if not os.path.exists(args.output):
+        os.mkdir(args.output)
+    if os.path.isdir(args.output):
+        assert os.path.isdir(args.output), args.output
+        out_path = os.path.join(args.output, filename)
+    else:
+        assert len(args.input) == 1, "Please specify a directory with args.output"
+        out_path = args.output
+    visualized_output.save(out_path)
+    return predictions["instances"].get('pred_boxes')
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
@@ -91,35 +137,6 @@ if __name__ == "__main__":
 
     cfg = setup_cfg(args)
 
-    demo = VisualizationDemo(cfg)
+    pred = Predictor(cfg)
 
-    if args.input:
-        for path in tqdm.tqdm(os.listdir(args.input[0]), disable=not args.output):
-            img = read_image(os.path.join(args.input[0], path), format="BGR")
-            start_time = time.time()
-            predictions, visualized_output = demo.run_on_image(img)
-            logger.info(
-                "{}: {} in {:.2f}s".format(
-                    path,
-                    "detected {} instances".format(len(predictions["instances"]))
-                    if "instances" in predictions
-                    else "finished",
-                    time.time() - start_time,
-                )
-            )
-
-            if args.output:
-                if not os.path.exists(args.output):
-                    os.mkdir(args.output)
-                if os.path.isdir(args.output):
-                    assert os.path.isdir(args.output), args.output
-                    out_filename = os.path.join(args.output, os.path.basename(path))
-                else:
-                    assert len(args.input) == 1, "Please specify a directory with args.output"
-                    out_filename = args.output
-                visualized_output.save(out_filename)
-            else:
-                cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-                cv2.imshow(WINDOW_NAME, visualized_output.get_image()[:, :, ::-1])
-                if cv2.waitKey(0) == 27:
-                    break  # esc to quit
+    app.run(debug=True)
