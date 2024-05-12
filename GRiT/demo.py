@@ -5,13 +5,15 @@ import time
 import cv2
 import tqdm
 import sys
+import json
 
+import logging
+import torch
 import numpy as np
 
-
 from flask import Flask, request, jsonify
-
 from PIL import Image
+from translate import Translator
 
 from detectron2.config import get_cfg
 from detectron2.data.detection_utils import read_image
@@ -26,6 +28,8 @@ from grit.predictor import Predictor
 
 # constants
 WINDOW_NAME = "GRiT"
+MODEL_VERSION = 1
+TRANSLATOR = 1
 app = Flask(__name__)
 
 def setup_cfg(args):
@@ -88,6 +92,10 @@ def get_parser():
     )
     return parser
 
+@app.route('/predict')
+def predictGet():
+    return 'ok!'
+
 @app.route('/predict', methods=['POST'])
 def predict():
     filename = request.files['image'].filename
@@ -107,15 +115,15 @@ def predict():
 
     start_time = time.time()
     predictions, visualized_output = pred.run_on_image(img)
-    logger.info(
-        "{}: {} in {:.2f}s".format(
-            filename,
-            "detected {} instances".format(len(predictions["instances"]))
-            if "instances" in predictions
-            else "finished",
-            time.time() - start_time,
-        )
-    )
+    # logger.info(
+    #     "{}: {} in {:.2f}s".format(
+    #         filename,
+    #         "detected {} instances".format(len(predictions["instances"]))
+    #         if "instances" in predictions
+    #         else "finished",
+    #         time.time() - start_time,
+    #     )
+    # )
 
     if not os.path.exists(args.output):
         os.mkdir(args.output)
@@ -126,17 +134,35 @@ def predict():
         assert len(args.input) == 1, "Please specify a directory with args.output"
         out_path = args.output
     visualized_output.save(out_path)
-    return predictions["instances"].get('pred_boxes')
+    print('INSTANCE DESCRIPRIONS START HERE')
+    instances = predictions["instances"].to(cpu_device)
+    print(instances)
+
+    result = {}
+    description = instances.pred_object_descriptions.data
+    descriptionRu = []
+    for prediction in description:
+        descriptionRu.append(translator.translate(prediction))
+    result['descriptionsEn'] = description
+    result['descriptionsRu'] = descriptionRu
+    result['modelVersion'] = MODEL_VERSION
+    result['translator'] = TRANSLATOR
+
+
+    return result
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     args = get_parser().parse_args()
-    setup_logger(name="fvcore")
-    logger = setup_logger()
-    logger.info("Arguments: " + str(args))
+    # setup_logger(name="fvcore")
+    # logger = setup_logger()
+    # logger.setLevel(logging.INFO)
+    # logger.info("Arguments: " + str(args))
 
     cfg = setup_cfg(args)
 
     pred = Predictor(cfg)
+    cpu_device = torch.device("cpu")
+    translator = Translator(from_lang="en", to_lang='ru')
 
-    app.run(debug=True)
+    app.run(debug=True, port=8888, host="0.0.0.0")
