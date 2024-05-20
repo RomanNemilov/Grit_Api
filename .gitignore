@@ -42,6 +42,9 @@ coverage.xml
 # Rope
 .ropeproject
 
+# VS Code
+*.vs/
+
 # Django stuff:
 *.log
 *.pot

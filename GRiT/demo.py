@@ -16,7 +16,7 @@ from PIL import Image
 from translate import Translator
 
 from detectron2.config import get_cfg
-from detectron2.data.detection_utils import read_image
+from detectron2.data.detection_utils import _apply_exif_orientation, convert_PIL_to_numpy
 from detectron2.utils.logger import setup_logger
 
 sys.path.insert(0, 'third_party/CenterNet2/projects/CenterNet2/')
@@ -99,19 +99,22 @@ def predictGet():
 @app.route('/predict', methods=['POST'])
 def predict():
     filename = request.files['image'].filename
+    file_stream = request.files['image'].stream
     image = Image.open(request.files['image'].stream)
     if (image != None):
         print('hey')
         print(filename)
 
-    image = image.convert('RGB')
-    img = np.asarray(image)
+    image = _apply_exif_orientation(image)
+    img = convert_PIL_to_numpy(image, format="BGR")
 
-    # если будет баг с ориентацией изображения решение здесь detectron2>data>detection_utils строка 119
+    #img = read_image(file_stream, format="BGR")
+
+
 
     # RGB > BGR
     # Можно не париться и задать input_format RGB, оно сделает это в модели
-    img = img[:, :, ::-1]
+
 
     start_time = time.time()
     predictions, visualized_output = pred.run_on_image(img)
