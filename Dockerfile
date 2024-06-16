@@ -13,7 +13,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install\
 COPY detectron2 /gritapi/detectron2/
 WORKDIR /gritapi/detectron2
 RUN pip install -e .
-COPY GRiT /gritapi/GRiT/
+COPY GRiT/requirements.txt /gritapi/GRiT/
 WORKDIR /gritapi/GRiT
 RUN pip install -r requirements.txt
 COPY . /gritapi/

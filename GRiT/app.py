@@ -30,6 +30,7 @@ from grit.predictor import Predictor
 WINDOW_NAME = "GRiT"
 MODEL_VERSION = 1
 TRANSLATOR = 1
+KEY = 'AAAAC3NzaC1lZDI1NTE5AAAAIPRITl0dLRphht4xYaOjfWOnq99mK1TYMuQGwFkQmYic'
 app = Flask(__name__)
 
 def setup_cfg(args):
@@ -98,6 +99,10 @@ def predictGet():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    request_key = request.form.get('key')
+    if (request_key != KEY):
+        return 'wrong key', 403
+
     filename = request.files['image'].filename
     file_stream = request.files['image'].stream
     image = Image.open(request.files['image'].stream)
@@ -142,12 +147,12 @@ def predict():
     print(instances)
 
     result = {}
-    description = instances.pred_object_descriptions.data
-    descriptionRu = []
-    for prediction in description:
-        descriptionRu.append(translator.translate(prediction))
-    result['descriptionsEn'] = description
-    result['descriptionsRu'] = descriptionRu
+    descriptions = instances.pred_object_descriptions.data
+    concatedDescriptions = '; '.join(descriptions)
+    descriptionsRu = translator.translate(concatedDescriptions).split("; ")
+
+    result['descriptionsEn'] = descriptions
+    result['descriptionsRu'] = descriptionsRu
     result['modelVersion'] = MODEL_VERSION
     result['translator'] = TRANSLATOR
 
@@ -157,15 +162,15 @@ def predict():
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     args = get_parser().parse_args()
-    # setup_logger(name="fvcore")
-    # logger = setup_logger()
-    # logger.setLevel(logging.INFO)
+    setup_logger(name="fvcore")
+    logger = setup_logger()
+    logger.setLevel(logging.INFO)
     # logger.info("Arguments: " + str(args))
 
     cfg = setup_cfg(args)
 
     pred = Predictor(cfg)
     cpu_device = torch.device("cpu")
-    translator = Translator(from_lang="en", to_lang='ru')
+    translator = Translator(from_lang="en", to_lang='ru', email="nemilov220@gmail.com")
 
     app.run(debug=True, port=8888, host="0.0.0.0")
