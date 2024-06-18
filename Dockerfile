@@ -17,4 +17,4 @@ COPY GRiT/requirements.txt /gritapi/GRiT/
 WORKDIR /gritapi/GRiT
 RUN pip install -r requirements.txt
 COPY . /gritapi/
-CMD python demo.py --test-task DenseCap --config-file configs/GRiT_B_DenseCap_ObjectDet.yaml --output visualization --opts MODEL.WEIGHTS models/grit_b_densecap_objectdet.pth
+CMD python wsgi.py
